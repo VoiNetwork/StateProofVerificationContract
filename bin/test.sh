@@ -4,7 +4,7 @@ SCRIPT_DIR=$(dirname "${0}")
 
 source "${SCRIPT_DIR}"/set_vars.sh
 
-# Public: Starts up a private Algorand network, compiles the contract code and runs tests against it.
+# Public: Starts up a private Algorand network, compiles the application code and runs tests against it.
 #
 # Examples
 #
@@ -13,11 +13,9 @@ source "${SCRIPT_DIR}"/set_vars.sh
 # Returns exit code 0.
 function main {
   local algorand_dir
-  local version
 
   set_vars
 
-  version=$(<VERSION) # get the version from the version file
   algorand_dir="${PWD}/.algorand"
 
   if [[ ! -d "${algorand_dir}" ]]; then
@@ -34,7 +32,7 @@ function main {
   ./"${SCRIPT_DIR}"/compile.sh
 
   # run tests
-  go test -ldflags "-X stateproofverificationcontract.Version=$version"
+  go test
 
   # stop network
   "${algorand_dir}"/sandbox down

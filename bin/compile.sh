@@ -20,7 +20,7 @@ function main {
   set_vars
 
   build_dir="${PWD}/.build"
-  src_dir="${PWD}/contract"
+  src_dir="${PWD}/application"
 
   # if the .build/ directory does not exist, create it
   if [[ ! -d "${build_dir}" ]]; then
