@@ -95,9 +95,9 @@ func getSandboxAccounts() ([]crypto.Account, error) {
 	return accounts, nil
 }
 
-func TestAddStateProof(t *testing.T) {
-	var round uint64 = 3163393
-	var rootMerkelNode = "NTOZ6uZqd6IMXD80M4PmJUB1jzuKzd/Oyv2p1sj4c1QNBbjRfLiAC5mCVNmDoANyVulOJm1OrQ+kkCynMbMVkg=="
+func TestAddBlockHeaderCommitment(t *testing.T) {
+	var latestAttestedRound uint64 = 3163648
+	var blockHeaderCommitment = "RWfGGul9ffO44w21rILMayxmcm1s13F55QAJfv5V+OA="
 
 	algodClient := createAlgodClient()
 	accounts, err := getSandboxAccounts()
@@ -112,18 +112,18 @@ func TestAddStateProof(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	err = application.AddStateProof(round, rootMerkelNode)
+	err = application.AddBlockHeaderCommitment(latestAttestedRound, blockHeaderCommitment)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	savedStateProof, err := application.GetStateProofByFirstAttestedRound(round)
+	savedBlockHeaderCommitment, err := application.GetBlockHeaderCommitmentByRound(latestAttestedRound - 150)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if savedStateProof != rootMerkelNode {
-		t.Errorf("output %s not equal to expected %s", savedStateProof, rootMerkelNode)
+	if savedBlockHeaderCommitment != blockHeaderCommitment {
+		t.Errorf("output %s not equal to expected %s", savedBlockHeaderCommitment, blockHeaderCommitment)
 	}
 }
 

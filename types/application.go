@@ -9,7 +9,12 @@ import (
 	"github.com/algorand/go-algorand-sdk/v2/transaction"
 	"github.com/algorand/go-algorand-sdk/v2/types"
 	"log"
+	"math"
 	"stateproofverificationcontract/internal/utils"
+)
+
+const (
+	StateProofBlockIntervalSize uint64 = 256
 )
 
 type Application struct {
@@ -20,38 +25,22 @@ type Application struct {
 	Signer            crypto.Account
 }
 
-func (application Application) FundAppAccount(amount uint64, signer crypto.Account, suggestedParams types.SuggestedParams, note []byte) error {
-	appAddress := crypto.GetApplicationAddress(application.AppId)
-	if appAddress.IsZero() {
-		return fmt.Errorf("found to get app address for '%d'", application.AppId)
-	}
-	txn, err := transaction.MakePaymentTxn(
-		application.Signer.Address.String(),
-		appAddress.String(),
-		amount,
-		note,
-		"",
-		suggestedParams,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create app creation txn: %+v", err)
-	}
-
-	_, _, err = utils.SignAndSendTransaction(txn, signer, application.AlgodClient)
-
-	return err
+func calculateBlockCommitmentInterval(round uint64) uint64 {
+	return uint64(math.Ceil(float64(round) / float64(StateProofBlockIntervalSize)))
 }
 
-func (application Application) AddStateProof(firstAttestedRound uint64, rootMerkelNode string) error {
+func (application Application) AddBlockHeaderCommitment(lastAttestationRound uint64, blockHeaderCommitment string) error {
 	appAddress := crypto.GetApplicationAddress(application.AppId)
 	if appAddress.IsZero() {
 		return fmt.Errorf("found to get app address for '%d'", application.AppId)
 	}
-	boxKey := utils.ConvertUint64ToByteArray(firstAttestedRound)
+	blockCommitmentInterval := calculateBlockCommitmentInterval(lastAttestationRound)
+	log.Printf("AddBlockHeaderCommitment#blockCommitmentInterval: '%d'", blockCommitmentInterval)
+	boxKey := utils.ConvertUint64ToByteArray(blockCommitmentInterval)
 	appArgs := [][]byte{
-		[]byte("add_state_proof"),
+		[]byte("add_block_header_commitment"),
 		boxKey,
-		[]byte(rootMerkelNode),
+		[]byte(blockHeaderCommitment),
 	}
 	boxStorageFee := utils.CalculateAppMbrForBox(len(appArgs[1]), len(appArgs[2]))
 	suggestedParams, err := application.AlgodClient.SuggestedParams().Do(context.Background())
@@ -76,7 +65,7 @@ func (application Application) AddStateProof(firstAttestedRound uint64, rootMerk
 		},
 		suggestedParams,
 		application.Signer.Address,
-		[]byte(fmt.Sprintf("send state proof from round '%d'", firstAttestedRound)),
+		[]byte(fmt.Sprintf("send block header commitment from last attested round '%d'", lastAttestationRound)),
 		types.Digest{},
 		[32]byte{},
 		types.ZeroAddress,
@@ -87,18 +76,31 @@ func (application Application) AddStateProof(firstAttestedRound uint64, rootMerk
 		return err
 	}
 
-	log.Printf("added state proof in transaction '%s'", txnId)
+	log.Printf("added block header commitment in transaction '%s'", txnId)
 
 	return nil
 }
 
-func (application Application) GetStateProofByFirstAttestedRound(round uint64) (string, error) {
-	box, err := application.AlgodClient.GetApplicationBoxByName(application.AppId, utils.ConvertUint64ToByteArray(round)).Do(context.Background())
+func (application Application) FundAppAccount(amount uint64, signer crypto.Account, suggestedParams types.SuggestedParams, note []byte) error {
+	appAddress := crypto.GetApplicationAddress(application.AppId)
+	if appAddress.IsZero() {
+		return fmt.Errorf("found to get app address for '%d'", application.AppId)
+	}
+	txn, err := transaction.MakePaymentTxn(
+		application.Signer.Address.String(),
+		appAddress.String(),
+		amount,
+		note,
+		"",
+		suggestedParams,
+	)
 	if err != nil {
-		return "", fmt.Errorf("failed to get box for round '%d': %+v", round, err)
+		return fmt.Errorf("failed to create app creation txn: %+v", err)
 	}
 
-	return string(box.Value), nil
+	_, _, err = utils.SignAndSendTransaction(txn, signer, application.AlgodClient)
+
+	return err
 }
 
 func (application Application) GetAdminAddress() (types.Address, error) {
@@ -131,6 +133,17 @@ func (application Application) GetAdminAddress() (types.Address, error) {
 	}
 
 	return types.ZeroAddress, fmt.Errorf("admin address doesn't exist in state: %+v", err)
+}
+
+func (application Application) GetBlockHeaderCommitmentByRound(round uint64) (string, error) {
+	blockCommitmentInterval := calculateBlockCommitmentInterval(round)
+	log.Printf("GetBlockHeaderCommitmentByRound#blockCommitmentInterval: '%d'", blockCommitmentInterval)
+	box, err := application.AlgodClient.GetApplicationBoxByName(application.AppId, utils.ConvertUint64ToByteArray(blockCommitmentInterval)).Do(context.Background())
+	if err != nil {
+		return "", fmt.Errorf("failed to get box for round '%d': %+v", round, err)
+	}
+
+	return string(box.Value), nil
 }
 
 func (application Application) VerifyTransaction() bool {

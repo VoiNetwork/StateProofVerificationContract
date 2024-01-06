@@ -16,7 +16,7 @@ def main():
     )
 
     # checks if the state proof exists, if it does, it simply replaces it, otherwise it adds a new state proof entry
-    on_add_state_proof = Seq(
+    on_add_block_header_commitment = Seq(
         # Assert(is_admin),
         entry := App.box_get(Txn.application_args[1]),
         If(entry.hasValue())
@@ -28,7 +28,7 @@ def main():
     program = Cond(
         [Txn.application_id() == Int(0), on_creation],
         # functions
-        [Txn.application_args[0] == Bytes("add_state_proof"), on_add_state_proof],
+        [Txn.application_args[0] == Bytes("add_block_header_commitment"), on_add_block_header_commitment],
         # anyone can opt in
         [Txn.on_completion() == OnComplete.OptIn, Approve()],
         # only admin can delete or update
