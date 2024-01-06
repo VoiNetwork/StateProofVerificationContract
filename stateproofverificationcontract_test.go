@@ -95,6 +95,38 @@ func getSandboxAccounts() ([]crypto.Account, error) {
 	return accounts, nil
 }
 
+func TestAddStateProof(t *testing.T) {
+	var round uint64 = 3163393
+	var rootMerkelNode = "NTOZ6uZqd6IMXD80M4PmJUB1jzuKzd/Oyv2p1sj4c1QNBbjRfLiAC5mCVNmDoANyVulOJm1OrQ+kkCynMbMVkg=="
+
+	algodClient := createAlgodClient()
+	accounts, err := getSandboxAccounts()
+	if err != nil {
+		log.Fatalf("failed to get sandbox accounts: %s", err)
+	}
+
+	admin := accounts[0]
+
+	application, err := CreateApplication(algodClient, admin)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = application.AddStateProof(round, rootMerkelNode)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	savedStateProof, err := application.GetStateProofByFirstAttestedRound(round)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if savedStateProof != rootMerkelNode {
+		t.Errorf("output %s not equal to expected %s", savedStateProof, rootMerkelNode)
+	}
+}
+
 func TestCreateApplication(t *testing.T) {
 	algodClient := createAlgodClient()
 	accounts, err := getSandboxAccounts()
@@ -102,9 +134,9 @@ func TestCreateApplication(t *testing.T) {
 		log.Fatalf("failed to get sandbox accounts: %s", err)
 	}
 
-	creator := accounts[0]
+	admin := accounts[0]
 
-	_, err = CreateApplication(algodClient, creator)
+	_, err = CreateApplication(algodClient, admin)
 	if err != nil {
 		log.Fatal(err)
 	}

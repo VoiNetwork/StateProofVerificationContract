@@ -12,7 +12,7 @@ import (
 	stateproofverificationcontracttypes "stateproofverificationcontract/types"
 )
 
-func CreateApplication(algodClient *algod.Client, creator crypto.Account) (*stateproofverificationcontracttypes.Application, error) {
+func CreateApplication(algodClient *algod.Client, signer crypto.Account) (*stateproofverificationcontracttypes.Application, error) {
 	var (
 		localInts   uint64 = 0
 		localBytes  uint64 = 0
@@ -39,12 +39,12 @@ func CreateApplication(algodClient *algod.Client, creator crypto.Account) (*stat
 		clearStateProgramBinary,
 		types.StateSchema{NumUint: globalInts, NumByteSlice: globalBytes},
 		types.StateSchema{NumUint: localInts, NumByteSlice: localBytes},
-		[][]byte{[]byte(creator.Address.String())},
+		[][]byte{[]byte(signer.Address.String())},
 		nil,
 		nil,
 		nil,
 		suggestedParams,
-		creator.Address,
+		signer.Address,
 		nil,
 		types.Digest{},
 		[32]byte{},
@@ -54,33 +54,30 @@ func CreateApplication(algodClient *algod.Client, creator crypto.Account) (*stat
 		return nil, fmt.Errorf("failed to create app creation txn: %+v", err)
 	}
 
-	txnid, stxn, err := crypto.SignTransaction(creator.PrivateKey, txn)
+	// create the application on-chain
+	_, confirmedTxn, err := utils.SignAndSendTransaction(txn, signer, algodClient)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign transaction: %+v", err)
-	}
-
-	_, err = algodClient.SendRawTransaction(stxn).Do(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to send transaction: %+v", err)
-	}
-
-	confirmedTxn, err := transaction.WaitForConfirmation(algodClient, txnid, 4, context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("error waiting for confirmation: %+v", err)
+		return nil, err
 	}
 	appId := confirmedTxn.ApplicationIndex
 
 	log.Printf("created app with id: %d", appId)
 
-	return &stateproofverificationcontracttypes.Application{
+	application := &stateproofverificationcontracttypes.Application{
 		AlgodClient:       algodClient,
 		AppId:             appId,
 		ApprovalProgram:   approvalProgramBinary,
 		ClearStateProgram: clearStateProgramBinary,
-	}, nil
+		Signer:            signer,
+	}
+
+	// fund the minimum app account balance
+	err = application.FundAppAccount(100000, signer, suggestedParams, []byte(fmt.Sprintf("payment for minimum balance for application '%d' account", appId)))
+
+	return application, nil
 }
 
-func InitializeApplication(algodClient *algod.Client, appId uint64) (*stateproofverificationcontracttypes.Application, error) {
+func InitializeApplication(algodClient *algod.Client, appId uint64, signer crypto.Account) (*stateproofverificationcontracttypes.Application, error) {
 	approvalProgramBinary, err := utils.CompileTealProgram(algodClient, ".build/approval_program.teal")
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile approval program: %+v", err)
@@ -95,5 +92,6 @@ func InitializeApplication(algodClient *algod.Client, appId uint64) (*stateproof
 		AppId:             appId,
 		ApprovalProgram:   approvalProgramBinary,
 		ClearStateProgram: clearStateProgramBinary,
+		Signer:            signer,
 	}, nil
 }

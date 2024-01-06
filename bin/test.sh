@@ -40,7 +40,7 @@ function main {
   printf "%b running tests... \n" "${INFO_PREFIX}"
 
   # run tests
-  go test
+  go test -v
 
   # if the algod was not already running, stop the private network
   if [[ -z "${is_algod_running}" ]]; then
