@@ -46,7 +46,7 @@ go mod tidy
 ./bin/test.sh
 ```
 
-> ⚠️ **NOTE:** running the tests will also install (if you haven't install one previously) and start a private Algorand sandbox.
+> ⚠️ **NOTE:** running the tests will also install (if you haven't installed one previously) and start a private Algorand private network.
 
 <sup>[Back to top ^][table-of-contents]</sup>
 

@@ -13,6 +13,7 @@ source "${SCRIPT_DIR}"/set_vars.sh
 # Returns exit code 0.
 function main {
   local algorand_dir
+  local is_algod_running
 
   set_vars
 
@@ -25,17 +26,27 @@ function main {
 
   printf "%b staring private algorand network... \n" "${INFO_PREFIX}"
 
-  # start private network, if this is the first time, this will take a while to download dependencies
-  "${algorand_dir}"/sandbox up dev
+  is_algod_running=$(docker ps | grep algorand-sandbox-algod)
+
+  # if it is not already running start a  private network
+  if [[ -z "${is_algod_running}" ]]; then
+     printf "%b algorand sandbox not running, initializing... \n" "${INFO_PREFIX}"
+     "${algorand_dir}"/sandbox up dev
+  fi
 
   # compile the teal code
   ./"${SCRIPT_DIR}"/compile.sh
 
+  printf "%b running tests... \n" "${INFO_PREFIX}"
+
   # run tests
   go test
 
-  # stop network
-  "${algorand_dir}"/sandbox down
+  # if the algod was not already running, stop the private network
+  if [[ -z "${is_algod_running}" ]]; then
+     printf "%b stopping algorand sandbox... \n" "${INFO_PREFIX}"
+     "${algorand_dir}"/sandbox up dev
+  fi
 
   exit 0
 }

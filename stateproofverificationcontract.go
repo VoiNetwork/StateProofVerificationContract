@@ -9,11 +9,10 @@ import (
 	"github.com/algorand/go-algorand-sdk/v2/types"
 	"log"
 	"stateproofverificationcontract/internal/utils"
+	stateproofverificationcontracttypes "stateproofverificationcontract/types"
 )
 
-var Version string
-
-func CreateApplication(algodClient *algod.Client, creator crypto.Account) (uint64, error) {
+func CreateApplication(algodClient *algod.Client, creator crypto.Account) (*stateproofverificationcontracttypes.Application, error) {
 	var (
 		localInts   uint64 = 0
 		localBytes  uint64 = 0
@@ -23,16 +22,16 @@ func CreateApplication(algodClient *algod.Client, creator crypto.Account) (uint6
 
 	approvalProgramBinary, err := utils.CompileTealProgram(algodClient, ".build/approval_program.teal")
 	if err != nil {
-		return 0, fmt.Errorf("failed to compile approval program: %+v", err)
+		return nil, fmt.Errorf("failed to compile approval program: %+v", err)
 	}
 	clearStateProgramBinary, err := utils.CompileTealProgram(algodClient, ".build/clear_state_program.teal")
 	if err != nil {
-		return 0, fmt.Errorf("failed to compile clear state program: %+v", err)
+		return nil, fmt.Errorf("failed to compile clear state program: %+v", err)
 	}
 
 	suggestedParams, err := algodClient.SuggestedParams().Do(context.Background())
 	if err != nil {
-		return 0, fmt.Errorf("error getting suggested transaction params: %+v", err)
+		return nil, fmt.Errorf("error getting suggested transaction params: %+v", err)
 	}
 	txn, err := transaction.MakeApplicationCreateTx(
 		false,
@@ -52,30 +51,49 @@ func CreateApplication(algodClient *algod.Client, creator crypto.Account) (uint6
 		types.ZeroAddress,
 	)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create app creation txn: %+v", err)
+		return nil, fmt.Errorf("failed to create app creation txn: %+v", err)
 	}
 
 	txnid, stxn, err := crypto.SignTransaction(creator.PrivateKey, txn)
 	if err != nil {
-		return 0, fmt.Errorf("failed to sign transaction: %+v", err)
+		return nil, fmt.Errorf("failed to sign transaction: %+v", err)
 	}
 
 	_, err = algodClient.SendRawTransaction(stxn).Do(context.Background())
 	if err != nil {
-		return 0, fmt.Errorf("failed to send transaction: %+v", err)
+		return nil, fmt.Errorf("failed to send transaction: %+v", err)
 	}
 
 	confirmedTxn, err := transaction.WaitForConfirmation(algodClient, txnid, 4, context.Background())
 	if err != nil {
-		return 0, fmt.Errorf("error waiting for confirmation: %+v", err)
+		return nil, fmt.Errorf("error waiting for confirmation: %+v", err)
 	}
 	appId := confirmedTxn.ApplicationIndex
 
 	log.Printf("created app with id: %d", appId)
 
-	return appId, nil
+	return &stateproofverificationcontracttypes.Application{
+		AlgodClient:       algodClient,
+		AppId:             appId,
+		ApprovalProgram:   approvalProgramBinary,
+		ClearStateProgram: clearStateProgramBinary,
+	}, nil
 }
 
-func GetVersion() string {
-	return Version
+func InitializeApplication(algodClient *algod.Client, appId uint64) (*stateproofverificationcontracttypes.Application, error) {
+	approvalProgramBinary, err := utils.CompileTealProgram(algodClient, ".build/approval_program.teal")
+	if err != nil {
+		return nil, fmt.Errorf("failed to compile approval program: %+v", err)
+	}
+	clearStateProgramBinary, err := utils.CompileTealProgram(algodClient, ".build/clear_state_program.teal")
+	if err != nil {
+		return nil, fmt.Errorf("failed to compile clear state program: %+v", err)
+	}
+
+	return &stateproofverificationcontracttypes.Application{
+		AlgodClient:       algodClient,
+		AppId:             appId,
+		ApprovalProgram:   approvalProgramBinary,
+		ClearStateProgram: clearStateProgramBinary,
+	}, nil
 }

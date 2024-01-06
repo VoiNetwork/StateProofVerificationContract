@@ -109,3 +109,27 @@ func TestCreateApplication(t *testing.T) {
 		log.Fatal(err)
 	}
 }
+
+func TestGetAdminAddress(t *testing.T) {
+	algodClient := createAlgodClient()
+	accounts, err := getSandboxAccounts()
+	if err != nil {
+		log.Fatalf("failed to get sandbox accounts: %s", err)
+	}
+
+	creator := accounts[0]
+
+	application, err := CreateApplication(algodClient, creator)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	adminAddress, err := application.GetAdminAddress()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if adminAddress != creator.Address {
+		t.Errorf("output %s not equal to expected %s", adminAddress.String(), creator.Address.String())
+	}
+}
